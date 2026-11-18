@@ -1,0 +1,36 @@
+name: Test restore-keys with multiple paths and cross-archive flags
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          path: |
+            rk-target-a
+            rk-target-b/**
+          key: act-test-rk-${{ github.run_id }}-primary-nonexistent
+          restore-keys: |
+            act-test-rk-${{ github.run_id }}-prefix-nonexistent-
+            act-test-rk-${{ github.run_id }}-other-nonexistent-
+          enableCrossOsArchive: 'true'
+          enableCrossArchArchive: 'true'
+      - name: Assert no hit and no matched key
+        env:
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          MATCHED: ${{ steps.action.outputs.cache-matched-key }}
+        run: |
+          echo "cache-hit: '$HIT'"
+          echo "cache-matched-key: '$MATCHED'"
+          if [ "$HIT" = "true" ]; then
+            echo "FAIL: unexpected exact cache hit"
+            exit 1
+          fi
+          if [ -n "$MATCHED" ]; then
+            echo "FAIL: no restore key should have matched"
+            exit 1
+          fi
+          echo "PASS"

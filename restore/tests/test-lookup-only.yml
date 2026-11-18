@@ -1,0 +1,30 @@
+name: Test lookup-only
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          path: lookup-target
+          key: act-test-lookup-only-${{ github.run_id }}-nonexistent
+          lookup-only: 'true'
+      - name: Assert lookup did not download or hit
+        env:
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          MATCHED: ${{ steps.action.outputs.cache-matched-key }}
+        run: |
+          echo "cache-hit: '$HIT'"
+          echo "cache-matched-key: '$MATCHED'"
+          if [ "$HIT" = "true" ]; then
+            echo "FAIL: unexpected cache hit"
+            exit 1
+          fi
+          if [ -e lookup-target ]; then
+            echo "FAIL: lookup-only must not download anything"
+            exit 1
+          fi
+          echo "PASS"

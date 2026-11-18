@@ -1,0 +1,35 @@
+name: Test multi-path save with optional inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create files to cache
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/dir-a" "$GITHUB_WORKSPACE/dir-b"
+          echo "a" > "$GITHUB_WORKSPACE/dir-a/a.txt"
+          echo "b" > "$GITHUB_WORKSPACE/dir-b/b.log"
+      - id: action
+        uses: .
+        with:
+          path: |
+            dir-a
+            dir-b/*.log
+          key: act-test-multi-${{ runner.os }}-${{ github.run_id }}
+          upload-chunk-size: '1048576'
+          enableCrossOsArchive: 'true'
+          enableCrossArchArchive: 'true'
+      - name: Assert step succeeded
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          [ -f "$GITHUB_WORKSPACE/dir-a/a.txt" ] || { echo "FAIL: dir-a/a.txt missing"; exit 1; }
+          [ -f "$GITHUB_WORKSPACE/dir-b/b.log" ] || { echo "FAIL: dir-b/b.log missing"; exit 1; }
+          echo "PASS"

@@ -1,0 +1,40 @@
+name: Test basic restore (cache miss)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          path: cache-target
+          key: act-test-basic-miss-${{ github.run_id }}-nonexistent-key
+      - name: Assert no cache hit
+        env:
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          PRIMARY: ${{ steps.action.outputs.cache-primary-key }}
+          MATCHED: ${{ steps.action.outputs.cache-matched-key }}
+          EXPECTED_KEY: act-test-basic-miss-${{ github.run_id }}-nonexistent-key
+        run: |
+          echo "cache-hit: '$HIT'"
+          echo "cache-primary-key: '$PRIMARY'"
+          echo "cache-matched-key: '$MATCHED'"
+          if [ "$HIT" = "true" ]; then
+            echo "FAIL: unexpected cache hit for nonexistent key"
+            exit 1
+          fi
+          if [ -n "$PRIMARY" ] && [ "$PRIMARY" != "$EXPECTED_KEY" ]; then
+            echo "FAIL: primary key '$PRIMARY' != '$EXPECTED_KEY'"
+            exit 1
+          fi
+          if [ -n "$MATCHED" ]; then
+            echo "FAIL: matched key should be empty on a miss"
+            exit 1
+          fi
+          if [ -e cache-target ]; then
+            echo "FAIL: cache-target should not have been restored"
+            exit 1
+          fi
+          echo "PASS"

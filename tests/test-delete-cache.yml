@@ -1,0 +1,41 @@
+name: Test delete-cache
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare path
+        run: |
+          mkdir -p "$RUNNER_TEMP/del-dir"
+          echo keep > "$RUNNER_TEMP/del-dir/keep.txt"
+      - id: action
+        uses: .
+        env:
+          WARPBUILD_RUNNER_VERIFICATION_TOKEN: ""
+        with:
+          path: ${{ runner.temp }}/del-dir
+          key: test-delete-${{ github.run_id }}
+          delete-cache: "true"
+          upload-chunk-size: "33554432"
+      - name: Assert graceful no-op
+        env:
+          ACTUAL: ${{ steps.action.outputs.cache-hit }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "cache-hit: $ACTUAL"
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected cache-hit 'false'"
+            exit 1
+          fi
+          if [ "$(cat "$RUNNER_TEMP/del-dir/keep.txt")" != "keep" ]; then
+            echo "FAIL: local files must not be deleted"
+            exit 1
+          fi
+          echo "PASS"
