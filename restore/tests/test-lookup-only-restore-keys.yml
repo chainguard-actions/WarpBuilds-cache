@@ -1,0 +1,45 @@
+name: Test lookup-only with restore-keys miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate unique key
+        id: key
+        run: |
+          prefix="act-test-lookup-$(date +%s%N)-$RANDOM"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "key=$prefix-primary" >> "$GITHUB_OUTPUT"
+      - id: action
+        uses: .
+        with:
+          path: |
+            /tmp/warp-lookup-a
+            /tmp/warp-lookup-b
+          key: ${{ steps.key.outputs.key }}
+          restore-keys: |
+            ${{ steps.key.outputs.prefix }}-other-
+            ${{ steps.key.outputs.prefix }}-zzz-
+          lookup-only: 'true'
+      - name: Assert lookup-only miss
+        env:
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          MATCHED: ${{ steps.action.outputs.cache-matched-key }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME hit: '$HIT' matched: '$MATCHED'"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: step should succeed"; exit 1
+          fi
+          if [ "$HIT" = "true" ]; then
+            echo "FAIL: unexpected cache hit"; exit 1
+          fi
+          if [ -n "$MATCHED" ]; then
+            echo "FAIL: matched key should be empty"; exit 1
+          fi
+          if [ -e /tmp/warp-lookup-a ] || [ -e /tmp/warp-lookup-b ]; then
+            echo "FAIL: nothing should be downloaded"; exit 1
+          fi
+          echo "PASS"

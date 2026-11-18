@@ -1,0 +1,37 @@
+name: Test lookup-only with restore-keys
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        env:
+          WARPBUILD_RUNNER_VERIFICATION_TOKEN: ""
+        with:
+          path: ~/.npm
+          key: test-lookup-${{ runner.os }}-abc123
+          restore-keys: |
+            test-lookup-${{ runner.os }}-
+            test-lookup-
+          lookup-only: "true"
+          enableCrossOsArchive: "true"
+          enableCrossArchArchive: "true"
+      - name: Assert cache-hit is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.cache-hit }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "cache-hit: $ACTUAL"
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success outcome"
+            exit 1
+          fi
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected cache-hit 'false'"
+            exit 1
+          fi
+          echo "PASS"

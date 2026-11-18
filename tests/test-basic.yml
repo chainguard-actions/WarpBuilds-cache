@@ -1,0 +1,42 @@
+name: Test basic usage (no WarpBuild token)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a file to cache
+        run: |
+          mkdir -p cache-dir
+          echo "hello" > cache-dir/data.txt
+      - id: action
+        uses: .
+        env:
+          WARPBUILD_RUNNER_VERIFICATION_TOKEN: ""
+        with:
+          path: cache-dir
+          key: test-basic-${{ runner.os }}-key
+      - name: Assert cache-hit is false and step succeeded
+        env:
+          ACTUAL: ${{ steps.action.outputs.cache-hit }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "cache-hit: $ACTUAL"
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success outcome"
+            exit 1
+          fi
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected cache-hit 'false'"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert cached path left intact
+        run: |
+          if [ "$(cat cache-dir/data.txt)" != "hello" ]; then
+            echo "FAIL: cache-dir/data.txt was modified"
+            exit 1
+          fi
+          echo "PASS"

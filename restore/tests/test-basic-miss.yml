@@ -1,0 +1,41 @@
+name: Test basic cache miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate unique key
+        id: key
+        run: echo "key=act-test-miss-$(date +%s%N)-$RANDOM" >> "$GITHUB_OUTPUT"
+      - id: action
+        uses: .
+        with:
+          path: /tmp/warp-cache-test-dir
+          key: ${{ steps.key.outputs.key }}
+      - name: Assert no exact cache hit and nothing restored
+        env:
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          PRIMARY: ${{ steps.action.outputs.cache-primary-key }}
+          MATCHED: ${{ steps.action.outputs.cache-matched-key }}
+          EXPECTED_KEY: ${{ steps.key.outputs.key }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME hit: '$HIT' primary: '$PRIMARY' matched: '$MATCHED'"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: step should succeed on a miss"; exit 1
+          fi
+          if [ "$HIT" = "true" ]; then
+            echo "FAIL: unexpected cache hit for unique key"; exit 1
+          fi
+          if [ -n "$PRIMARY" ] && [ "$PRIMARY" != "$EXPECTED_KEY" ]; then
+            echo "FAIL: primary key mismatch"; exit 1
+          fi
+          if [ -n "$MATCHED" ]; then
+            echo "FAIL: matched key should be empty on miss"; exit 1
+          fi
+          if [ -e /tmp/warp-cache-test-dir ]; then
+            echo "FAIL: path should not have been restored"; exit 1
+          fi
+          echo "PASS"

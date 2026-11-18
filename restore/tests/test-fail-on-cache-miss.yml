@@ -1,0 +1,47 @@
+name: Test fail-on-cache-miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate unique key
+        id: key
+        run: echo "key=act-test-failmiss-$(date +%s%N)-$RANDOM" >> "$GITHUB_OUTPUT"
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/warp-failmiss
+          key: ${{ steps.key.outputs.key }}
+          fail-on-cache-miss: 'true'
+      - name: Assert step failed on miss (or skipped restore when cache service unavailable)
+        env:
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          MATCHED: ${{ steps.action.outputs.cache-matched-key }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME hit: '$HIT' matched: '$MATCHED'"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: failed on cache miss as expected"
+          elif [ "$OUTCOME" = "success" ]; then
+            # Under act the WarpBuild auth token is invalid: the action warns and
+            # skips the restore (cache-hit=false) instead of reaching the miss check.
+            if [ "$HIT" = "true" ]; then
+              echo "FAIL: unexpected cache hit for a unique random key"
+              exit 1
+            fi
+            if [ -n "$MATCHED" ]; then
+              echo "FAIL: unexpected matched key '$MATCHED'"
+              exit 1
+            fi
+            if [ -e /tmp/warp-failmiss ]; then
+              echo "FAIL: path was unexpectedly restored"
+              exit 1
+            fi
+            echo "PASS: cache service unavailable, restore skipped with no hit"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

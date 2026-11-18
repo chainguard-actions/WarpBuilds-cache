@@ -1,0 +1,32 @@
+name: Test delete-cache
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        env:
+          WARPBUILD_RUNNER_VERIFICATION_TOKEN: ""
+        with:
+          path: delete-me
+          key: test-delete-${{ runner.os }}
+          delete-cache: "true"
+      - name: Assert step succeeded without error
+        env:
+          ACTUAL: ${{ steps.action.outputs.cache-hit }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "cache-hit: $ACTUAL"
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success outcome"
+            exit 1
+          fi
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected cache-hit 'false'"
+            exit 1
+          fi
+          echo "PASS"

@@ -1,0 +1,39 @@
+name: Test save with multiple paths and globs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create files to cache
+        run: |
+          mkdir -p multi/a multi/b
+          echo "a" > multi/a/one.txt
+          echo "b" > multi/b/two.log
+          echo "c" > multi/b/three.txt
+      - id: action
+        uses: .
+        with:
+          path: |
+            multi/a
+            multi/b/*.txt
+          key: act-test-multi-${{ github.run_id }}
+          upload-chunk-size: '33554432'
+          enableCrossArchArchive: 'true'
+      - name: Assert step succeeded and files untouched
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          for f in multi/a/one.txt multi/b/two.log multi/b/three.txt; do
+            if [ ! -f "$f" ]; then
+              echo "FAIL: $f missing"
+              exit 1
+            fi
+          done
+          echo "PASS"

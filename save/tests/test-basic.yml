@@ -1,0 +1,31 @@
+name: Test basic save
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create files to cache
+        run: |
+          mkdir -p cache-dir
+          echo "hello cache" > cache-dir/file.txt
+      - id: action
+        uses: .
+        with:
+          path: cache-dir
+          key: act-test-basic-${{ github.run_id }}
+      - name: Assert step succeeded and files untouched
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if [ "$(cat cache-dir/file.txt)" != "hello cache" ]; then
+            echo "FAIL: cached file content changed"
+            exit 1
+          fi
+          echo "PASS"
