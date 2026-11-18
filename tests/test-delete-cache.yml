@@ -1,0 +1,38 @@
+name: Test delete-cache mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/del-dir"
+          echo keep > "$RUNNER_TEMP/del-dir/keep.txt"
+      - id: action
+        uses: .
+        with:
+          path: ${{ runner.temp }}/del-dir
+          key: test-delete-${{ github.run_id }}
+          delete-cache: "true"
+      - name: Assert delete-cache does not fail and leaves local files intact
+        env:
+          ACTUAL: ${{ steps.action.outputs.cache-hit }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $ACTUAL"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success outcome (delete must not fail when cache is absent)"
+            exit 1
+          fi
+          if [ "$ACTUAL" = "true" ]; then
+            echo "FAIL: delete-cache must never report a cache hit"
+            exit 1
+          fi
+          if [ "$(cat "$RUNNER_TEMP/del-dir/keep.txt")" != "keep" ]; then
+            echo "FAIL: local files were modified"
+            exit 1
+          fi
+          echo "PASS"

@@ -1,0 +1,38 @@
+name: Test upload-chunk-size input (graceful cache miss)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare cache directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/chunk-cache-dir"
+          echo "chunked" > "$RUNNER_TEMP/chunk-cache-dir/file.txt"
+      - id: action
+        uses: .
+        with:
+          path: ${{ runner.temp }}/chunk-cache-dir
+          key: test-upload-chunk-size-${{ github.run_id }}
+          upload-chunk-size: "33554432"
+      - name: Assert step succeeded and cache-hit is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.cache-hit }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $ACTUAL"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success outcome"
+            exit 1
+          fi
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected cache-hit 'false'"
+            exit 1
+          fi
+          if [ "$(cat "$RUNNER_TEMP/chunk-cache-dir/file.txt")" != "chunked" ]; then
+            echo "FAIL: cached path content was modified"
+            exit 1
+          fi
+          echo "PASS"

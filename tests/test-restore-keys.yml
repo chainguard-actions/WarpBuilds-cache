@@ -1,0 +1,41 @@
+name: Test restore-keys and multiple paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/a" "$RUNNER_TEMP/b"
+          echo a > "$RUNNER_TEMP/a/a.txt"
+          echo b > "$RUNNER_TEMP/b/b.txt"
+      - id: action
+        uses: .
+        with:
+          path: |
+            ${{ runner.temp }}/a
+            ${{ runner.temp }}/b
+          key: test-restore-keys-${{ github.run_id }}
+          restore-keys: |
+            test-restore-keys-
+            test-
+          enableCrossOsArchive: "true"
+          enableCrossArchArchive: "true"
+      - name: Assert graceful miss
+        env:
+          ACTUAL: ${{ steps.action.outputs.cache-hit }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $ACTUAL"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success outcome"
+            exit 1
+          fi
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected cache-hit 'false' (restore-key matches never count as exact hit)"
+            exit 1
+          fi
+          echo "PASS"

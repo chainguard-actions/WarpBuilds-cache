@@ -1,0 +1,43 @@
+name: Test basic restore (cache miss)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Compute unique key
+        id: k
+        run: echo "key=act-test-miss-${{ github.run_id }}-$RANDOM-$(date +%s%N)" >> "$GITHUB_OUTPUT"
+      - id: action
+        uses: .
+        with:
+          path: restored-cache-dir
+          key: ${{ steps.k.outputs.key }}
+      - name: Assert cache miss outputs
+        env:
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          PRIMARY: ${{ steps.action.outputs.cache-primary-key }}
+          MATCHED: ${{ steps.action.outputs.cache-matched-key }}
+          KEY: ${{ steps.k.outputs.key }}
+        run: |
+          echo "cache-hit: '$HIT'"
+          echo "cache-primary-key: '$PRIMARY'"
+          echo "cache-matched-key: '$MATCHED'"
+          if [ "$HIT" = "true" ]; then
+            echo "FAIL: unexpected cache hit for a unique key"
+            exit 1
+          fi
+          if [ -n "$PRIMARY" ] && [ "$PRIMARY" != "$KEY" ]; then
+            echo "FAIL: cache-primary-key '$PRIMARY' != '$KEY'"
+            exit 1
+          fi
+          if [ -n "$MATCHED" ]; then
+            echo "FAIL: expected no matched key, got '$MATCHED'"
+            exit 1
+          fi
+          if [ -e restored-cache-dir ]; then
+            echo "FAIL: path should not be created on cache miss"
+            exit 1
+          fi
+          echo "PASS"

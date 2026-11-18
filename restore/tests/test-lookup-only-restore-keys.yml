@@ -1,0 +1,45 @@
+name: Test lookup-only with restore-keys
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Compute unique key
+        id: k
+        run: echo "suffix=${{ github.run_id }}-$RANDOM-$(date +%s%N)" >> "$GITHUB_OUTPUT"
+      - id: action
+        uses: .
+        with:
+          path: |
+            lookup-dir-a
+            lookup-dir-b
+          key: act-test-lookup-${{ steps.k.outputs.suffix }}
+          restore-keys: |
+            act-test-lookup-prefix-${{ steps.k.outputs.suffix }}-
+            act-test-lookup-other-${{ steps.k.outputs.suffix }}-
+          lookup-only: 'true'
+      - name: Assert no hit and nothing downloaded
+        env:
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          PRIMARY: ${{ steps.action.outputs.cache-primary-key }}
+          MATCHED: ${{ steps.action.outputs.cache-matched-key }}
+          KEY: act-test-lookup-${{ steps.k.outputs.suffix }}
+        run: |
+          echo "cache-hit: '$HIT'"
+          echo "cache-primary-key: '$PRIMARY'"
+          echo "cache-matched-key: '$MATCHED'"
+          if [ "$HIT" = "true" ]; then
+            echo "FAIL: unexpected cache hit"
+            exit 1
+          fi
+          if [ -n "$PRIMARY" ] && [ "$PRIMARY" != "$KEY" ]; then
+            echo "FAIL: cache-primary-key mismatch"
+            exit 1
+          fi
+          if [ -e lookup-dir-a ] || [ -e lookup-dir-b ]; then
+            echo "FAIL: lookup-only must not create paths"
+            exit 1
+          fi
+          echo "PASS"

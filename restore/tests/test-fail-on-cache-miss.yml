@@ -1,0 +1,39 @@
+name: Test fail-on-cache-miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Compute unique key
+        id: k
+        run: echo "key=act-test-failmiss-${{ github.run_id }}-$RANDOM-$(date +%s%N)" >> "$GITHUB_OUTPUT"
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path: failmiss-dir
+          key: ${{ steps.k.outputs.key }}
+          fail-on-cache-miss: 'true'
+      - name: Assert step failed on cache miss
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          HIT: ${{ steps.action.outputs.cache-hit }}
+          PRIMARY: ${{ steps.action.outputs.cache-primary-key }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: '$HIT'"
+          echo "cache-primary-key: '$PRIMARY'"
+          if [ "$HIT" = "true" ]; then
+            echo "FAIL: unexpected cache hit"
+            exit 1
+          fi
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed on cache miss"
+          elif [ "$OUTCOME" = "success" ] && [ -z "$PRIMARY" ]; then
+            echo "PASS: cache service unavailable, action returned early before lookup"
+          else
+            echo "FAIL: expected failure on cache miss, got outcome '$OUTCOME'"
+            exit 1
+          fi

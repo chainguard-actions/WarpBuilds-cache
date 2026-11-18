@@ -1,0 +1,37 @@
+name: Test basic usage (no WarpBuild backend -> graceful cache miss)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare cache directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/cache-dir"
+          echo "hello" > "$RUNNER_TEMP/cache-dir/file.txt"
+      - id: action
+        uses: .
+        with:
+          path: ${{ runner.temp }}/cache-dir
+          key: test-basic-${{ github.run_id }}
+      - name: Assert step succeeded and cache-hit is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.cache-hit }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $ACTUAL"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success outcome"
+            exit 1
+          fi
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected cache-hit 'false'"
+            exit 1
+          fi
+          if [ "$(cat "$RUNNER_TEMP/cache-dir/file.txt")" != "hello" ]; then
+            echo "FAIL: cached path content was modified"
+            exit 1
+          fi
+          echo "PASS"
